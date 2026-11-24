@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>해야 하는 일</title>
+
+    <!-- 깔끔한 한글 및 영문 가독성을 위한 Inter & Noto Sans KR 폰트 로드 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Tailwind 커스텀 테마 및 부드러운 전환 애니메이션 설정 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans KR', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    },
+                    keyframes: {
+                        fadeSlideIn: {
+                            '0%': { opacity: '0', transform: 'translateY(-6px) scale(0.98)' },
+                            '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+                        },
+                        checkPop: {
+                            '0%': { transform: 'scale(0.8)' },
+                            '50%': { transform: 'scale(1.15)' },
+                            '100%': { transform: 'scale(1)' },
+                        },
+                        shake: {
+                            '0%, 100%': { transform: 'translateX(0)' },
+                            '25%': { transform: 'translateX(-4px)' },
+                            '75%': { transform: 'translateX(4px)' },
+                        },
+                        toastUp: {
+                            '0%': { opacity: '0', transform: 'translate(-50%, 16px)' },
+                            '100%': { opacity: '1', transform: 'translate(-50%, 0)' },
+                        }
+                    },
+                    animation: {
+                        'fade-slide-in': 'fadeSlideIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'check-pop': 'checkPop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        'shake': 'shake 0.25s ease-in-out',
+                        'toast-up': 'toastUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-800 font-sans antialiased selection:bg-blue-100 selection:text-blue-700 flex justify-center sm:py-8 sm:px-4">
+
+    <!-- 메인 모바일 웹 앱 컨테이너 (최대 너비 480px 중앙 정렬) -->
+    <main class="w-full max-w-[480px] min-h-screen sm:min-h-[680px] sm:max-h-[860px] bg-white sm:rounded-3xl sm:shadow-xl sm:shadow-slate-200/80 sm:border sm:border-slate-200/70 flex flex-col overflow-hidden relative">
+
+        <!-- 상단 헤더 영역: 날짜 없이 제목과 남은 일/완료 개수 요약만 심플하게 배치 -->
+        <header class="px-6 pt-7 pb-5 bg-white border-b border-slate-100 sticky top-0 z-10">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">
+                    해야 하는 일
+                </h1>
+
+                <!-- 남은 일 · 완료 개수 요약 배지 -->
+                <div id="summary-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold transition-colors duration-200">
+                    <span>남은 일 <strong id="remaining-count" class="text-blue-600 font-bold">0</strong></span>
+                    <span class="text-slate-300" aria-hidden="true">·</span>
+                    <span>완료 <strong id="completed-summary-count" class="text-emerald-600 font-bold">0</strong></span>
+                </div>
+            </div>
+
+            <!-- 전체 진행률 미니 바 -->
+            <div class="mt-4 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-300 ease-out" style="width: 0%;"></div>
+            </div>
+
+            <!-- 해야 하는 일 입력 폼 -->
+            <form id="todo-form" class="mt-5 flex items-center gap-2" autocomplete="off">
+                <div class="relative flex-1">
+                    <input
+                        id="todo-input"
+                        type="text"
+                        placeholder="해야 하는 일을 입력하세요..."
+                        maxlength="120"
+                        aria-label="해야 하는 일 입력"
+                        class="w-full h-12 pl-4 pr-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm sm:text-base text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-150"
+                    />
+                </div>
+                <button
+                    type="submit"
+                    aria-label="할 일 추가"
+                    class="h-12 px-5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold shadow-sm shadow-blue-600/20 transition-all duration-150 shrink-0 flex items-center justify-center gap-1 cursor-pointer"
+                >
+                    <span>추가</span>
+                </button>
+            </form>
+        </header>
+
+        <!-- 할 일 목록 스크롤 영역 -->
+        <section class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-6 pb-20">
+
+            <!-- 1. 미완료(수행 전) 할 일 목록 영역 -->
+            <div id="active-section">
+                <ul id="active-list" class="space-y-2.5" aria-label="미완료 할 일 목록">
+                    <!-- JS를 통해 미완료 항목이 여기에 렌더링됩니다 -->
+                </ul>
+
+                <!-- 할 일이 전혀 없거나 모두 완료했을 때 표시되는 안내 메시지 -->
+                <div id="empty-state" class="hidden py-12 px-4 text-center">
+                    <div id="empty-icon" class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">
+                        <!-- 기본 체크리스트 SVG 아이콘 -->
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                        </svg>
+                    </div>
+                    <p id="empty-title" class="text-sm font-semibold text-slate-600">등록된 일이 없습니다</p>
+                    <p id="empty-subtitle" class="text-xs text-slate-400 mt-1">위 입력창에 해야 하는 일을 적어보세요.</p>
+                </div>
+            </div>
+
+            <!-- 2. 완료된 할 일 영역 (완료 항목이 1개 이상일 때만 표시) -->
+            <div id="completed-section" class="hidden pt-2">
+                <!-- 미완료와 완료 목록을 구분하는 은은한 구분선 헤더 -->
+                <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-t border-slate-100 pt-5">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-slate-400 tracking-wide">
+                            완료됨 <span id="completed-count" class="text-emerald-600 font-bold">0</span>개
+                        </span>
+                    </div>
+                    <button
+                        id="clear-completed-btn"
+                        type="button"
+                        class="text-xs font-medium text-slate-400 hover:text-rose-500 active:scale-95 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 transition-all duration-150 cursor-pointer"
+                    >
+                        완료 항목 삭제
+                    </button>
+                </div>
+
+                <!-- 완료된 할 일 리스트 -->
+                <ul id="completed-list" class="space-y-2" aria-label="완료된 할 일 목록">
+                    <!-- JS를 통해 완료 항목이 여기에 렌더링됩니다 -->
+                </ul>
+            </div>
+
+        </section>
+
+        <!-- 하단 알림 토스트 (삭제 실행 취소 및 피드백용, alert/confirm 미사용) -->
+        <div
+            id="toast"
+            role="status"
+            aria-live="polite"
+            class="hidden fixed sm:absolute bottom-5 left-1/2 -translate-x-1/2 z-30 w-[calc(100%-2rem)] max-w-[420px] bg-slate-800/95 backdrop-blur-sm text-white text-xs sm:text-sm px-4 py-3 rounded-2xl shadow-lg flex items-center justify-between gap-3"
+        >
+            <span id="toast-message" class="font-medium truncate">메시지</span>
+            <button
+                id="toast-undo-btn"
+                type="button"
+                class="hidden shrink-0 text-blue-300 hover:text-blue-200 font-semibold px-2 py-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+            >
+                되돌리기
+            </button>
+        </div>
+
+    </main>
+
+    <!-- 앱 핵심 로직 스크립트 -->
+    <script>
+        (function () {
+            'use strict';
+
+            // =========================================================================
+            // 1. 상수 및 상태 관리
+            // =========================================================================
+            const STORAGE_KEY = 'simple_korean_todo_items_v1';
+
+            // 할 일 데이터 배열: { id, text, completed, createdAt, completedAt }
+            let todos = [];
+
+            // 최근 추가되거나 상태가 변경된 항목 ID (시각적 피드백 애니메이션 적용용)
+            let highlightedId = null;
+
+            // 실행 취소(Undo) 기능을 위한 직전 상태 스냅샷 및 토스트 타이머
+            let previousSnapshot = null;
+            let toastTimer = null;
+
+            // =========================================================================
+            // 2. DOM 요소 참조
+            // =========================================================================
+            const summaryBadgeEl = document.getElementById('summary-badge');
+            const remainingCountEl = document.getElementById('remaining-count');
+            const completedSummaryCountEl = document.getElementById('completed-summary-count');
+            const progressBarEl = document.getElementById('progress-bar');
+
+            const todoFormEl = document.getElementById('todo-form');
+            const todoInputEl = document.getElementById('todo-input');
+
+            const activeListEl = document.getElementById('active-list');
+            const emptyStateEl = document.getElementById('empty-state');
+            const emptyIconEl = document.getElementById('empty-icon');
+            const emptyTitleEl = document.getElementById('empty-title');
+            const emptySubtitleEl = document.getElementById('empty-subtitle');
+
+            const completedSectionEl = document.getElementById('completed-section');
+            const completedCountEl = document.getElementById('completed-count');
+            const completedListEl = document.getElementById('completed-list');
+            const clearCompletedBtnEl = document.getElementById('clear-completed-btn');
+
+            const toastEl = document.getElementById('toast');
+            const toastMessageEl = document.getElementById('toast-message');
+            const toastUndoBtnEl = document.getElementById('toast-undo-btn');
+
+            // =========================================================================
+            // 3. 안전한 로컬 스토리지 유틸리티 (샌드박스 환경 오류 방지 try-catch)
+            // =========================================================================
+
+            /**
+             * localStorage에서 할 일 목록을 불러옵니다.
+             * 최초 방문 시 사용법을 직관적으로 확인할 수 있도록 간단한 예시 항목을 제공합니다.
+             */
+            function loadTodos() {
+                try {
+                    const rawData = window.localStorage.getItem(STORAGE_KEY);
+                    if (rawData === null) {
+                        // 최초 실행 시 데모용 초기 데이터
+                        const now = Date.now();
+                        return [
+                            {
+                                id: generateId(),
+                                text: '해야 하는 일을 입력하고 추가 버튼을 눌러보세요',
+                                completed: false,
+                                createdAt: now,
+                                completedAt: null
+                            },
+                            {
+                                id: generateId(),
+                                text: '왼쪽 체크박스를 누르면 하단으로 내려갑니다',
+                                completed: false,
+                                createdAt: now - 1000,
+                                completedAt: null
+                            },
+                            {
+                                id: generateId(),
+                                text: '완료된 항목은 다시 눌러 상단으로 올릴 수 있어요',
+                                completed: true,
+                                createdAt: now - 2000,
+                                completedAt: now - 500
+                            }
+                        ];
+                    }
+                    const parsed = JSON.parse(rawData);
+                    if (Array.isArray(parsed)) {
+                        return parsed.filter(item =>
+                            item && typeof item.id === 'string' && typeof item.text === 'string'
+                        );
+                    }
+                    return [];
+                } catch (error) {
+                    // iframe 샌드박스나 시크릿 모드 등으로 storage 접근이 제한된 경우 메모리로 안전하게 동작
+                    console.warn('localStorage 불러오기 실패 (메모리 모드로 동작):', error);
+                    return [];
+                }
+            }
+
+            /**
+             * 현재 할 일 목록을 localStorage에 자동 저장합니다.
+             */
+            function saveTodos() {
+                try {
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+                } catch (error) {
+                    console.warn('localStorage 저장 실패:', error);
+                }
+            }
+
+            /**
+             * 고유 ID를 생성합니다.
+             */
+            function generateId() {
+                return 'todo_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+            }
+
+            // =========================================================================
+            // 4. 토스트 피드백 함수
+            // =========================================================================
+
+            /**
+             * 하단 토스트 메시지를 표시합니다. (실행 취소 버튼 옵션 지원)
+             */
+            function showToast(message, allowUndo = false) {
+                if (toastTimer) {
+                    clearTimeout(toastTimer);
+                }
+
+                toastMessageEl.textContent = message;
+                if (allowUndo) {
+                    toastUndoBtnEl.classList.remove('hidden');
+                } else {
+                    toastUndoBtnEl.classList.add('hidden');
+                }
+
+                // 애니메이션 재실행을 위해 클래스 리셋
+                toastEl.classList.remove('hidden', 'animate-toast-up');
+                void toastEl.offsetWidth; // 리플로우 트리거
+                toastEl.classList.add('animate-toast-up');
+
+                toastTimer = setTimeout(() => {
+                    hideToast();
+                }, allowUndo ? 4000 : 2200);
+            }
+
+            /**
+             * 토스트 메시지를 숨깁니다.
+             */
+            function hideToast() {
+                toastEl.classList.add('hidden');
+                toastEl.classList.remove('animate-toast-up');
+                previousSnapshot = null;
+            }
+
+            // =========================================================================
+            // 5. 핵심 비즈니스 로직 (추가, 완료 토글, 삭제, 완료 일괄 삭제)
+            // =========================================================================
+
+            /**
+             * 새로운 할 일을 미완료 목록 최상단에 추가합니다.
+             */
+            function addTodo(rawText) {
+                const text = rawText.trim();
+                if (!text) {
+                    // 빈 입력 시 입력창에 부드러운 흔들림 피드백
+                    todoInputEl.classList.remove('animate-shake');
+                    void todoInputEl.offsetWidth;
+                    todoInputEl.classList.add('animate-shake');
+                    todoInputEl.focus();
+                    return;
+                }
+
+                const newTodo = {
+                    id: generateId(),
+                    text: text,
+                    completed: false,
+                    createdAt: Date.now(),
+                    completedAt: null
+                };
+
+                todos.unshift(newTodo);
+                highlightedId = newTodo.id;
+                saveTodos();
+                render();
+
+                todoInputEl.value = '';
+                todoInputEl.focus();
+            }
+
+            /**
+             * 특정 항목의 완료 여부를 토글합니다.
+             * 완료 시 하단으로 자동 이동, 해제 시 상단 미완료 목록으로 자동 이동합니다.
+             */
+            function toggleTodo(id) {
+                const target = todos.find(item => item.id === id);
+                if (!target) return;
+
+                target.completed = !target.completed;
+                target.completedAt = target.completed ? Date.now() : null;
+
+                // 이동한 위치에서 자연스럽게 등장하도록 하이라이트 지정
+                highlightedId = target.id;
+                saveTodos();
+                render();
+            }
+
+            /**
+             * 특정 항목을 목록에서 삭제합니다. (실행 취소 가능)
+             */
+            function deleteTodo(id) {
+                const target = todos.find(item => item.id === id);
+                if (!target) return;
+
+                // 실행 취소용 스냅샷 저장
+                previousSnapshot = todos.map(item => ({ ...item }));
+                todos = todos.filter(item => item.id !== id);
+                highlightedId = null;
+                saveTodos();
+                render();
+
+                showToast('항목을 삭제했습니다.', true);
+            }
+
+            /**
+             * 완료된 모든 항목을 일괄 삭제합니다. (실행 취소 가능)
+             */
+            function clearCompletedTodos() {
+                const completedCount = todos.filter(item => item.completed).length;
+                if (completedCount === 0) return;
+
+                previousSnapshot = todos.map(item => ({ ...item }));
+                todos = todos.filter(item => !item.completed);
+                highlightedId = null;
+                saveTodos();
+                render();
+
+                showToast('완료된 항목 ' + completedCount + '개를 삭제했습니다.', true);
+            }
+
+            /**
+             * 직전 삭제 작업을 되돌립니다.
+             */
+            function undoLastAction() {
+                if (!previousSnapshot) return;
+                todos = previousSnapshot;
+                previousSnapshot = null;
+                highlightedId = null;
+                saveTodos();
+                render();
+                hideToast();
+            }
+
+            // =========================================================================
+            // 6. DOM 렌더링 (자동 정렬 및 UI 업데이트)
+            // =========================================================================
+
+            /**
+             * 개별 할 일 항목(<li>) DOM 요소를 안전하게 생성합니다. (XSS 방지: textContent 사용)
+             */
+            function createTodoItemElement(todo) {
+                const li = document.createElement('li');
+                const isHighlighted = todo.id === highlightedId;
+
+                // 완료 상태에 따른 카드 스타일 분기
+                const baseCardClasses = todo.completed
+                    ? 'group flex items-center gap-1.5 p-1.5 pr-2 rounded-2xl bg-slate-50/80 border border-slate-100 hover:bg-slate-50 transition-all duration-200'
+                    : 'group flex items-center gap-1.5 p-1.5 pr-2 rounded-2xl bg-white border border-slate-200/80 shadow-sm shadow-slate-200/40 hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5 transition-all duration-200';
+
+                li.className = isHighlighted ? baseCardClasses + ' animate-fade-slide-in' : baseCardClasses;
+                li.dataset.id = todo.id;
+
+                // 1) 왼쪽 체크박스 + 텍스트 클릭 영역 (모바일에서 누르기 편한 넉넉한 터치 타겟)
+                const toggleBtn = document.createElement('button');
+                toggleBtn.type = 'button';
+                toggleBtn.setAttribute('aria-pressed', String(todo.completed));
+                toggleBtn.setAttribute('aria-label', todo.completed ? todo.text + ' 완료 해제' : todo.text + ' 완료 처리');
+                toggleBtn.className = 'flex-1 flex items-center gap-3 min-h-[44px] py-2 pl-2 pr-1 text-left rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 cursor-pointer';
+
+                // 시각적 커스텀 체크박스 박스
+                const checkboxVisual = document.createElement('span');
+                checkboxVisual.className = todo.completed
+                    ? 'w-6 h-6 shrink-0 rounded-full bg-emerald-500 border-2 border-emerald-500 text-white flex items-center justify-center shadow-sm shadow-emerald-500/20 transition-all duration-200' + (isHighlighted ? ' animate-check-pop' : '')
+                    : 'w-6 h-6 shrink-0 rounded-full bg-white border-2 border-slate-300 group-hover:border-blue-400 flex items-center justify-center transition-all duration-200';
+
+                // 체크 마크 SVG 아이콘
+                if (todo.completed) {
+                    checkboxVisual.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>';
+                }
+
+                // 할 일 텍스트
+                const textSpan = document.createElement('span');
+                textSpan.textContent = todo.text;
+                textSpan.className = todo.completed
+                    ? 'text-sm sm:text-[15px] leading-snug text-slate-400 line-through break-all transition-colors duration-200'
+                    : 'text-sm sm:text-[15px] leading-snug font-medium text-slate-800 break-all transition-colors duration-200';
+
+                toggleBtn.appendChild(checkboxVisual);
+                toggleBtn.appendChild(textSpan);
+
+                // 클릭 시 완료/미완료 토글
+                toggleBtn.addEventListener('click', function () {
+                    toggleTodo(todo.id);
+                });
+
+                // 2) 오른쪽 삭제(×) 버튼 (넉넉한 터치 타겟 40x40px)
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.setAttribute('aria-label', todo.text + ' 삭제');
+                deleteBtn.className = 'w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 active:scale-90 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer';
+                deleteBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>';
+
+                deleteBtn.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    deleteTodo(todo.id);
+                });
+
+                li.appendChild(toggleBtn);
+                li.appendChild(deleteBtn);
+
+                return li;
+            }
+
+            /**
+             * 전체 앱 화면을 현재 상태에 맞게 다시 그립니다.
+             * 핵심 규칙:
+             *  - 미완료 항목은 항상 상단 영역에 최신 등록순으로 정렬
+             *  - 완료 항목은 항상 하단 구분선 아래에 최근 완료순으로 정렬
+             */
+            function render() {
+                // 미완료 / 완료 항목 분리 및 정렬
+                const activeTodos = todos
+                    .filter(item => !item.completed)
+                    .sort((a, b) => b.createdAt - a.createdAt);
+
+                const completedTodos = todos
+                    .filter(item => item.completed)
+                    .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+
+                const totalCount = todos.length;
+                const remainingCount = activeTodos.length;
+                const completedCount = completedTodos.length;
+
+                // 1) 상단 요약 배지(남은 일 · 완료) 및 진행률 바 업데이트
+                remainingCountEl.textContent = String(remainingCount);
+                completedSummaryCountEl.textContent = String(completedCount);
+
+                if (totalCount > 0 && remainingCount === 0) {
+                    summaryBadgeEl.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold transition-colors duration-200';
+                } else {
+                    summaryBadgeEl.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold transition-colors duration-200';
+                }
+
+                const progressPercent = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
+                progressBarEl.style.width = progressPercent + '%';
+
+                // 2) 미완료 리스트 렌더링
+                activeListEl.innerHTML = '';
+                const activeFragment = document.createDocumentFragment();
+                activeTodos.forEach(todo => {
+                    activeFragment.appendChild(createTodoItemElement(todo));
+                });
+                activeListEl.appendChild(activeFragment);
+
+                // 3) 빈 상태(Empty State) 처리
+                if (activeTodos.length === 0) {
+                    emptyStateEl.classList.remove('hidden');
+                    if (completedTodos.length > 0) {
+                        // 모든 일을 끝마친 상태
+                        emptyIconEl.className = 'w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500';
+                        emptyIconEl.innerHTML = '<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>';
+                        emptyTitleEl.textContent = '해야 하는 일을 모두 끝냈어요!';
+                        emptySubtitleEl.textContent = '수고하셨습니다. 새로운 일을 추가할 수 있어요.';
+                    } else {
+                        // 목록 자체가 완전히 비어 있는 상태
+                        emptyIconEl.className = 'w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400';
+                        emptyIconEl.innerHTML = '<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>';
+                        emptyTitleEl.textContent = '등록된 일이 없습니다';
+                        emptySubtitleEl.textContent = '위 입력창에 해야 하는 일을 적어보세요.';
+                    }
+                } else {
+                    emptyStateEl.classList.add('hidden');
+                }
+
+                // 4) 완료 리스트 및 구분선 섹션 렌더링
+                completedListEl.innerHTML = '';
+                if (completedTodos.length > 0) {
+                    completedSectionEl.classList.remove('hidden');
+                    completedCountEl.textContent = String(completedCount);
+
+                    const completedFragment = document.createDocumentFragment();
+                    completedTodos.forEach(todo => {
+                        completedFragment.appendChild(createTodoItemElement(todo));
+                    });
+                    completedListEl.appendChild(completedFragment);
+                } else {
+                    completedSectionEl.classList.add('hidden');
+                }
+
+                // 렌더링 후 하이라이트 초기화 (다음 무관한 렌더링 시 중복 애니메이션 방지)
+                highlightedId = null;
+            }
+
+            // =========================================================================
+            // 7. 이벤트 바인딩 및 앱 초기화
+            // =========================================================================
+
+            // 폼 제출 (엔터키 또는 '추가' 버튼 클릭)
+            todoFormEl.addEventListener('submit', function (event) {
+                event.preventDefault();
+                addTodo(todoInputEl.value);
+            });
+
+            // 완료 항목 일괄 삭제 버튼 클릭
+            clearCompletedBtnEl.addEventListener('click', function () {
+                clearCompletedTodos();
+            });
+
+            // 토스트 내 '되돌리기' 버튼 클릭
+            toastUndoBtnEl.addEventListener('click', function () {
+                undoLastAction();
+            });
+
+            // 앱 시작
+            function init() {
+                todos = loadTodos();
+                render();
+            }
+
+            init();
+        })();
+    </script>
+</body>
+</html>
